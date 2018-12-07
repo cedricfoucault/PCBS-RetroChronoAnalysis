@@ -13,7 +13,8 @@ n.jSOA <- length(jSOA)
 # Proportion of each distrib component
 p.base.seen <- 0.55
 ## valid cue
-p.valid.not.seen <- c(0.35, 0.30, 0.24, 0.32, 0.35, 0.39)
+#p.valid.not.seen <- c(0.35, 0.30, 0.24, 0.32, 0.35, 0.39) # Thibault et al
+p.valid.not.seen <- rep(0, n.soa)
 p.valid.seen <- 1 - p.valid.not.seen
 p.valid.seen.retro <- c(0, 0, 0, (p.valid.seen - p.base.seen)[4:6])
 p.valid.seen <- p.valid.seen - p.valid.seen.retro
@@ -27,7 +28,7 @@ djSOA.not.seen <- matrix(dunif(jSOA, jSOA.min, jSOA.max), nrow = n.soa, ncol = n
 # "(Initially) Seen" gaussian distrib component
 djSOA.mean.base.slope <- 0.5 # 0.2 ? <Marti et al 2010> Outside the interference regime, the iSOA increased by 135 ms (F(1, 9) = 6.53, p < 0.05) when the SOA increased from 700 to 1050 ms
 djSOA.mean.base.intercept <- -20.0
-djSOA.sd.base <- 50 # 300 ? from <Marti et al 2010>: SEM ~= 100, N=10, sd = SEM * sqrt(N-1)
+djSOA.sd.base <- 100 # 300 ? from <Marti et al 2010>: SEM ~= 100, N=10, sd = SEM * sqrt(N-1)
 djSOA.mean.invalid.seen <- soa * djSOA.mean.base.slope + djSOA.mean.base.intercept
 djSOA.sd.invalid.seen <- rep(djSOA.sd.base, times=n.soa)
 djSOA.mean.valid.seen <- djSOA.mean.invalid.seen # NO attention effect
