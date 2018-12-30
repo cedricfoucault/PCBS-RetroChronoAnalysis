@@ -29,24 +29,28 @@ p.retro <- function(soa.toCue) {
   approxfun(c(0, data.soa.toCue), c(0, data.p.retro), rule=2)(soa.toCue) # add (0,0) data point : no retro when soa.toCue <= 0
 }
 
-# Point of Subjective Simultaneity (PSS)
+# Target-to-Beep Point of Subjective Simultaneity (PSS)
 
-## Base Target-to-Beep PSS when target is initially seen, no cue
+## base PSS when target is initially seen, no cue
 pss.toBeep.seen <- -10 # -10ms from <W Fujisaki, S Shimojo, M Kashino, S Nishida - Nature neuroscience, 2004>
 
-## Target-Beep PSS with Time Marker Model
-pss.toBeep.retro.TM <- function(soa.toCue = 0) {
-  pss.toBeep.seen # constant
+## PSS when target is seen by retroperception 
+pss.toBeep.retro <- function(soa.toCue = 0, model) {
+  if (model == "CA") # Conscious Access Model: PSS close to cue
+    pss.toBeep.seen + soa.toCue
+  else # Time Marker Model: PSS close to beep
+    pss.toBeep.seen # constant
 }
 
-## Target-Beep with Conscious Access Model
-pss.toBeep.retro.CA <- function(soa.toCue = 0) {
-  pss.toBeep.seen + soa.toCue
+# Slope
+
+jnd.toBeep.seen <- 30 # from <Hanson_et_al 2008 Exp_Brain_Res RecalibrationOfPerceivedTimeAc> estimate of sensitivity to temporal order in the form of just-noticeable difference (JND) (approximately half the offset between the 27 and 73% response levels on the psychometric function)
+
+jnd.toBeep.retro <- function(soa.toCue = 0, model) {
+  jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
 }
 
 # Psychometric Functions
-
-jnd.toBeep.seen <- 30 # from <Hanson_et_al 2008 Exp_Brain_Res RecalibrationOfPerceivedTimeAc> estimate of sensitivity to temporal order in the form of just-noticeable difference (JND) (approximately half the offset between the 27 and 73% response levels on the psychometric function)
 
 ## logistic function to fit the psychometric functions to
 logistic <- function(x, mu = 0, teta = 1) {
@@ -58,17 +62,10 @@ p.beforeBeep.seen <- function(soa.toBeep) {
   logistic(soa.toBeep, pss.toBeep.seen, jnd.toBeep.seen)
 }
 
-## psychometric function for retro-seen trials assuming Time Marker model
-p.beforeBeep.retro.TM <- function(soa.toBeep, soa.toCue = 0) {
-  pss <- pss.toBeep.retro.TM(soa.toCue)
-  jnd <- jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
-  logistic(soa.toBeep, pss, jnd)
-}
-
-## psychometric function for retro-seen trials assuming Conscious Access model
-p.beforeBeep.retro.CA <- function(soa.toBeep, soa.toCue = 0) {
-  pss <- pss.toBeep.retro.CA(soa.toCue)
-  jnd <- jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
+## psychometric function for retro-seen trials
+p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
+  pss <- pss.toBeep.retro(soa.toCue, model)
+  jnd <- jnd.toBeep.retro(soa.toCue, model)
   logistic(soa.toBeep, pss, jnd)
 }
 
@@ -78,7 +75,7 @@ rau.transform <- function(p) {
   asin(sqrt(p))
 }
 
-# Approximation of sensitivity from p(correct response), assuming H = 1- F
+# Approximation of sensitivity from p(correct response), assuming H = 1 - F (no bias)
 sensitivity.transform <- function(pc) {
   2 * qnorm(pc)
 }
@@ -88,9 +85,8 @@ sensitivity.transform <- function(pc) {
 ## Mixture psychometric functions
 
 p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model) {
-  p.beforeBeep.retro <- if (model == "CA") p.beforeBeep.retro.CA else p.beforeBeep.retro.TM
   p.r <- p.retro(soa.toCue)
-  p.beforeBeep <- p.r * p.beforeBeep.retro(soa.toBeep, soa.toCue) + (1 - p.r) * p.beforeBeep.seen(soa.toBeep)
+  p.beforeBeep <- p.r * p.beforeBeep.retro(soa.toBeep, soa.toCue, model) + (1 - p.r) * p.beforeBeep.seen(soa.toBeep)
   if (include.guesses) {
     p.s <- p.seen(soa.toCue)
     p.beforeBeep <- p.s * p.beforeBeep + (1 - p.s) * 0.5 # assume no bias in guesses
@@ -98,12 +94,7 @@ p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model) {
     p.beforeBeep
   }
 }
-p.beforeBeep.mixture.CA <- function(soa.toBeep, soa.toCue = 0) {
-  p.beforeBeep.mixture(soa.toBeep, soa.toCue, model = "CA")
-}
-p.beforeBeep.mixture.TM <- function(soa.toBeep, soa.toCue = 0) {
-  p.beforeBeep.mixture(soa.toBeep, soa.toCue, model = "TM")
-}
+
 p.beforeBeep.mixture.nocue <- function(soa.toBeep) {
   if (include.guesses) {
     p.seen.nocue * p.beforeBeep.seen(soa.toBeep) + (1 - p.seen.nocue) * 0.5 # assume no bias in guesses
@@ -117,17 +108,11 @@ p.beforeBeep.mixture.nocue <- function(soa.toBeep) {
 pss.toBeep.mixture.nocue <- pss.toBeep.seen
 pss.toBeep.mixture <- function(soa.toCue, model) {
   min <- pss.toBeep.mixture.nocue
-  max <- if (model == "CA") pss.toBeep.retro.CA(soa.toCue) else pss.toBeep.retro.TM(soa.toCue)
+  max <- pss.toBeep.retro(soa.toCue, model)
   soa.test <- seq(min, max, by=1)
   p.test <- p.beforeBeep.mixture(soa.test, soa.toCue, model)
   i <- which(abs(p.test - 0.5) == min(abs(p.test - 0.5)))
   soa.test[i]
-}
-pss.toBeep.mixture.CA <- function(soa.toCue) {
-  pss.toBeep.mixture(soa.toCue, model = "CA")
-}
-pss.toBeep.mixture.TM <- function(soa.toCue) {
-  pss.toBeep.mixture(soa.toCue, model = "TM")
 }
 
 # Plots
@@ -139,34 +124,25 @@ data.soa.toBeep <- seq(-400, 400, by=1)
 #data.p.beforeBeep.mixture.CA <- sapply(data.soa.toBeep, function(x) p.beforeBeep.mixture.CA(x, soa.toCue = data.soa.toCue))
 
 ## Figure 1 : Mixture psychometric function
-data.soa.toCue <- 300
+data.soa.toCue <- 200
 quartz()
 par(mfrow=c(2, 1))
 par(oma=c(2, 0, 0, 0))
-### 1A cue & no-cue, CA Model
-plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
-     type="l", col="black", lty="dotted",
-     xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
-     ylim=c(0,1),
-     main="CA Model")
-lines(data.soa.toBeep, p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue),
-      col="blue", lty="dashed")
-legend("topleft", inset=.05, lwd=2,
-       c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
-       col=c("black","blue"),
-       lty=c("dotted", "dashed"))
-### 1B , TM Model
-plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
-     type="l", col="black", lty="dotted",
-     xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
-     ylim=c(0,1),
-     main="TM Model")
-lines(data.soa.toBeep, p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue),
-      col="green", lty="dashed")
-legend("topleft", inset=.05, lwd=2,
-       c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
-       col=c("black","green"),
-       lty=c("dotted", "dashed"))
+plot.mixtures <- function(model, color) {
+  plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       main=sprintf("%s Model", model))
+  lines(data.soa.toBeep, p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue, model),
+        col=color, lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         col=c("black", color),
+         lty=c("dotted", "dashed"))
+}
+plot.mixtures("CA", "blue")
+plot.mixtures("TM", "green")
 mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
 
 ## Figure 1bis : Mixture psychometric function in RAU units
@@ -176,8 +152,8 @@ if (should.plot.rau) {
   par(oma=c(2, 0, 0, 0))
   ### 1A cue & no-cue, CA Model
   rau.nocue <- rau.transform(p.beforeBeep.mixture.nocue(data.soa.toBeep))
-  rau.CA <- rau.transform(p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue))
-  rau.TM <- rau.transform(p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue))
+  rau.CA <- rau.transform(p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue, model="CA"))
+  rau.TM <- rau.transform(p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue, model="TM"))
   plot(data.soa.toBeep, rau.nocue,
        type="l", col="black", lty="dotted",
        xlab="Target-to-Beep SOA (ms)", ylab="RAU P(\"T < B\")",
@@ -214,10 +190,10 @@ if (should.plot.sensitivity) {
   data.soa.toBeep.pos = data.soa.toBeep[data.soa.toBeep >= 0]
   pc.nocue <- c(1 - p.beforeBeep.mixture.nocue(data.soa.toBeep.neg),
                 p.beforeBeep.mixture.nocue(data.soa.toBeep.pos))
-  pc.CA <- c(1 - p.beforeBeep.mixture.CA(data.soa.toBeep.neg, soa.toCue = data.soa.toCue),
-             p.beforeBeep.mixture.CA(data.soa.toBeep.pos, soa.toCue = data.soa.toCue))
-  pc.TM <- c(1 - p.beforeBeep.mixture.TM(data.soa.toBeep.neg, soa.toCue = data.soa.toCue),
-             p.beforeBeep.mixture.TM(data.soa.toBeep.pos, soa.toCue = data.soa.toCue))
+  pc.CA <- c(1 - p.beforeBeep.mixture(data.soa.toBeep.neg, soa.toCue = data.soa.toCue, model="CA"),
+             p.beforeBeep.mixture(data.soa.toBeep.pos, soa.toCue = data.soa.toCue, model="CA"))
+  pc.TM <- c(1 - p.beforeBeep.mixture(data.soa.toBeep.neg, soa.toCue = data.soa.toCue, model="TM"),
+             p.beforeBeep.mixture(data.soa.toBeep.pos, soa.toCue = data.soa.toCue, model="TM"))
   sensitivity.nocue <- sensitivity.transform(pc.nocue)
   sensitivity.CA <- sensitivity.transform(pc.CA)
   sensitivity.TM <- sensitivity.transform(pc.TM)
@@ -287,7 +263,7 @@ if (should.plot.fig3) {
        xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
        main="CA Model")
   for (i in 1:length(data.soa.toCue)) {
-    lines(data.soa.toBeep, p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue[i]),
+    lines(data.soa.toBeep, p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue[i], model="CA"),
           col=colors[i], lty=ltys[i])
   }
   legend("topleft", inset=.05, lwd=2,
@@ -300,7 +276,7 @@ if (should.plot.fig3) {
        xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
        main="TM Model")
   for (i in 1:length(data.soa.toCue)) {
-    lines(data.soa.toBeep, p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue[i]),
+    lines(data.soa.toBeep, p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue[i], model="TM"),
           col=colors[i], lty=ltys[i])
   }
   legend("topleft", inset=.05, lwd=2,
