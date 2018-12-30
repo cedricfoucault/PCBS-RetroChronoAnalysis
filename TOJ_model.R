@@ -4,6 +4,9 @@ include.guesses <- FALSE
 # include.guesses <- TRUE
 should.plot.pss <- FALSE
 # should.plot.pss <- TRUE
+should.plot.rau <- TRUE
+should.plot.sensitivity <- TRUE
+should.plot.test.rau <- FALSE
 
 # Proportions of trials
 
@@ -58,15 +61,26 @@ p.beforeBeep.seen <- function(soa.toBeep) {
 ## psychometric function for retro-seen trials assuming Time Marker model
 p.beforeBeep.retro.TM <- function(soa.toBeep, soa.toCue = 0) {
   pss <- pss.toBeep.retro.TM(soa.toCue)
-  jnd <- jnd.toBeep.seen # todo: find appropriate value here
+  jnd <- jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
   logistic(soa.toBeep, pss, jnd)
 }
 
 ## psychometric function for retro-seen trials assuming Conscious Access model
 p.beforeBeep.retro.CA <- function(soa.toBeep, soa.toCue = 0) {
   pss <- pss.toBeep.retro.CA(soa.toCue)
-  jnd <- jnd.toBeep.seen # todo: find appropriate value here
+  jnd <- jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
   logistic(soa.toBeep, pss, jnd)
+}
+
+## Rationalized Arcsine Transform (Studebaker)
+
+rau.transform <- function(p) {
+  asin(sqrt(p))
+}
+
+# Approximation of sensitivity from p(correct response), assuming H = 1- F
+sensitivity.transform <- function(pc) {
+  2 * qnorm(pc)
 }
 
 # Mixture
@@ -125,14 +139,15 @@ data.soa.toBeep <- seq(-400, 400, by=1)
 #data.p.beforeBeep.mixture.CA <- sapply(data.soa.toBeep, function(x) p.beforeBeep.mixture.CA(x, soa.toCue = data.soa.toCue))
 
 ## Figure 1 : Mixture psychometric function
-data.soa.toCue <- 200
+data.soa.toCue <- 300
 quartz()
 par(mfrow=c(2, 1))
 par(oma=c(2, 0, 0, 0))
-### 1A cue@200ms & no-cue, CA Model
+### 1A cue & no-cue, CA Model
 plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
      type="l", col="black", lty="dotted",
      xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+     ylim=c(0,1),
      main="CA Model")
 lines(data.soa.toBeep, p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue),
       col="blue", lty="dashed")
@@ -144,6 +159,7 @@ legend("topleft", inset=.05, lwd=2,
 plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
      type="l", col="black", lty="dotted",
      xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+     ylim=c(0,1),
      main="TM Model")
 lines(data.soa.toBeep, p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue),
       col="green", lty="dashed")
@@ -152,6 +168,84 @@ legend("topleft", inset=.05, lwd=2,
        col=c("black","green"),
        lty=c("dotted", "dashed"))
 mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
+
+## Figure 1bis : Mixture psychometric function in RAU units
+if (should.plot.rau) {
+  quartz()
+  par(mfrow=c(2, 1))
+  par(oma=c(2, 0, 0, 0))
+  ### 1A cue & no-cue, CA Model
+  rau.nocue <- rau.transform(p.beforeBeep.mixture.nocue(data.soa.toBeep))
+  rau.CA <- rau.transform(p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue))
+  rau.TM <- rau.transform(p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue))
+  plot(data.soa.toBeep, rau.nocue,
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="RAU P(\"T < B\")",
+       ylim=c(0, rau.transform(1)),
+       main="CA Model")
+  lines(data.soa.toBeep, rau.CA,
+        col="blue", lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         col=c("black","blue"),
+         lty=c("dotted", "dashed"))
+  ### 1B , TM Model
+  plot(data.soa.toBeep, rau.nocue,
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="RAU P(\"T < B\")",
+       ylim=c(0, rau.transform(1)),
+       main="TM Model")
+  lines(data.soa.toBeep, rau.TM,
+        col="green", lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         col=c("black","green"),
+         lty=c("dotted", "dashed"))
+  mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
+}
+
+## Figure 1bisbis : Sensitivity as a function of SOA target-to-beep
+if (should.plot.sensitivity) {
+  quartz()
+  par(mfrow=c(2, 1))
+  par(oma=c(2, 0, 0, 0))
+  ### 1A cue & no-cue, CA Model
+  data.soa.toBeep.neg = data.soa.toBeep[data.soa.toBeep < 0]
+  data.soa.toBeep.pos = data.soa.toBeep[data.soa.toBeep >= 0]
+  pc.nocue <- c(1 - p.beforeBeep.mixture.nocue(data.soa.toBeep.neg),
+                p.beforeBeep.mixture.nocue(data.soa.toBeep.pos))
+  pc.CA <- c(1 - p.beforeBeep.mixture.CA(data.soa.toBeep.neg, soa.toCue = data.soa.toCue),
+             p.beforeBeep.mixture.CA(data.soa.toBeep.pos, soa.toCue = data.soa.toCue))
+  pc.TM <- c(1 - p.beforeBeep.mixture.TM(data.soa.toBeep.neg, soa.toCue = data.soa.toCue),
+             p.beforeBeep.mixture.TM(data.soa.toBeep.pos, soa.toCue = data.soa.toCue))
+  sensitivity.nocue <- sensitivity.transform(pc.nocue)
+  sensitivity.CA <- sensitivity.transform(pc.CA)
+  sensitivity.TM <- sensitivity.transform(pc.TM)
+  plot(data.soa.toBeep, sensitivity.nocue,
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="d'",
+       ylim=c(min(sensitivity.nocue, sensitivity.CA), max(sensitivity.nocue, sensitivity.CA)),
+       main="CA Model")
+  lines(data.soa.toBeep, sensitivity.CA,
+        col="blue", lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         col=c("black","blue"),
+         lty=c("dotted", "dashed"))
+  ### 1B , TM Model
+  plot(data.soa.toBeep, sensitivity.nocue,
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="d'",
+       ylim=c(min(sensitivity.nocue, sensitivity.TM), max(sensitivity.nocue, sensitivity.TM)),
+       main="TM Model")
+  lines(data.soa.toBeep, sensitivity.TM,
+        col="green", lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         col=c("black","green"),
+         lty=c("dotted", "dashed"))
+  mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
+}
 
 if (should.plot.pss) {
   ## Figure 2 : Mixture PSS
@@ -175,4 +269,50 @@ if (should.plot.pss) {
        type="b", col="blue", pch=3)
   points(data.soa.toCue, rep(pss.toBeep.mixture.nocue, length(data.soa.toCue)),
          type="b", col="black", pch=4)
+}
+
+should.plot.fig3 <- FALSE
+if (should.plot.fig3) {
+  ## Figure 3 : Mixture psychometric function with >1 soa
+  data.soa.toCue <- c(100, 200, 300, 400)
+  colors <- c("#71DA96","#52A370", "#36704C", "#1D412B")
+  ltys <-  rep("dashed", length(data.soa.toCue))
+  labels <- sapply(data.soa.toCue, function(s) sprintf("retro-cue: %dms", s))
+  quartz()
+  par(mfrow=c(2, 1))
+  par(oma=c(2, 0, 0, 0))
+  ### 1A cue & no-cue, CA Model
+  plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       main="CA Model")
+  for (i in 1:length(data.soa.toCue)) {
+    lines(data.soa.toBeep, p.beforeBeep.mixture.CA(data.soa.toBeep, soa.toCue = data.soa.toCue[i]),
+          col=colors[i], lty=ltys[i])
+  }
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", labels),
+         col=c("black", colors),
+         lty=c("dotted", ltys))
+  ### 1B , TM Model
+  plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep),
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       main="TM Model")
+  for (i in 1:length(data.soa.toCue)) {
+    lines(data.soa.toBeep, p.beforeBeep.mixture.TM(data.soa.toBeep, soa.toCue = data.soa.toCue[i]),
+          col=colors[i], lty=ltys[i])
+  }
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", labels),
+         col=c("black", colors),
+         lty=c("dotted", ltys))
+  mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
+}
+
+if (should.plot.test.rau) {
+  x <- seq(-5, 5, by=0.1)
+  y <- logistic(x)
+  plot(x, y, type='l', main="logistic")
+  plot(x, rau.transform(y), type='l', main="RAU(logistic")
 }
