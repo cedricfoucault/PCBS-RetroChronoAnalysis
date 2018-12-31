@@ -3,7 +3,29 @@ source("TOJ_model.R")
 should.plot.pss <- TRUE
 should.plot.rau <- TRUE
 should.plot.sensitivity <- TRUE
-should.plot.test.rau <- TRUE
+should.plot.test.rau <- FALSE
+
+## Mixture PSS
+
+pss.toBeep.mixture.nocue <- pss.toBeep.seen
+pss.toBeep.mixture <- function(soa.toCue, model) {
+  min <- pss.toBeep.mixture.nocue
+  max <- pss.toBeep.retro(soa.toCue, model)
+  soa.test <- seq(min, max, by=1)
+  p.test <- p.beforeBeep.mixture(soa.test, soa.toCue, model)
+  i <- which(abs(p.test - 0.5) == min(abs(p.test - 0.5)))
+  soa.test[i]
+}
+
+## Rationalized Arcsine Transform (Studebaker)
+rau.transform <- function(p) {
+  asin(sqrt(p))
+}
+
+# Approximation of sensitivity from p(correct response), assuming H = 1 - F (no bias)
+sensitivity.transform <- function(pc) {
+  2 * qnorm(pc)
+}
 
 ## Figure 1bis : Mixture psychometric function in RAU units
 if (should.plot.rau) {
