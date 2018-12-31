@@ -8,11 +8,11 @@
 
 # Proportions of trials
 
-# baseline probability to see the target with no cue,
+# baseline probability to see the target in no-cue condition,
 # data from Sergent_Thibault_et_al 2016 PLOS
 p.seen.nocue <- 0.55
 
-# proportion of "guess" trials
+## proportion of "guess" trials, with cue present
 p.guess <- function(soa.toCue) {
   # data from Sergent_Thibault_et_al 2016 PLOS
   data.soa.toCue <- c(-100, 100, 400)
@@ -21,16 +21,17 @@ p.guess <- function(soa.toCue) {
   approxfun(data.soa.toCue, data.p.guess, rule=2)(soa.toCue)
 }
 
-# fraction of "retro" trials among both "seen" and "retro" trials
+## fraction of "retro" trials among both "seen" and "retro" trials
 fraction.retro <- function(soa.toCue) {
   if (soa.toCue >= 0) {
-    # proportion of retro estimated as the increase in probability to see the target from baseline
+    ## defined as the increase in probability to see the target from the baseline
     (1 - p.seen.nocue - p.guess(soa.toCue)) / p.seen.nocue
   } else {
     0 # retroperception cannot happen when the cue appears before the target
   }
 }
 
+### with cue present
 p.trials <- function(soa.toCue, include.guesses = TRUE) {
   p.g <- if (include.guesses) p.guess(soa.toCue) else 0
   p.retro <- (1 - p.g) * fraction.retro(soa.toCue)
@@ -38,18 +39,24 @@ p.trials <- function(soa.toCue, include.guesses = TRUE) {
   list(guess = p.g, seen = p.seen, retro = p.retro)
 }
 
+### no cue
 p.trials.nocue <- function(include.guesses = TRUE) {
   p.g <- if (include.guesses) 1 - p.seen.nocue else 0
   p.s <- 1 - p.g
   list(guess = p.g, seen = p.s)
 }
 
-# Target-to-Beep Point of Subjective Simultaneity (PSS)
+# Psychometric Functions :
+# probability of getting response "Target before Beep"
+# as a function of the SOA between the Target and the Beep
+# in the TOJ task
 
-## base PSS when target is initially seen, no cue
+## PSS (Point of Subjective Simultaneity)
+
+## for "seen" trials
 pss.toBeep.seen <- -10 # -10ms from <W Fujisaki, S Shimojo, M Kashino, S Nishida - Nature neuroscience, 2004>
 
-## PSS when target is seen by retroperception 
+### for "retro" trials
 pss.toBeep.retro <- function(soa.toCue = 0, model) {
   if (model == "CA") { # Conscious Access Model: PSS close to cue
     pss.toBeep.seen + soa.toCue
@@ -58,42 +65,45 @@ pss.toBeep.retro <- function(soa.toCue = 0, model) {
   } 
 }
 
-# Slope
+## Slope
 
-jnd.toBeep.seen <- 30 # from <Hanson_et_al 2008 Exp_Brain_Res RecalibrationOfPerceivedTimeAc> estimate of sensitivity to temporal order in the form of just-noticeable difference (JND) (approximately half the offset between the 27 and 73% response levels on the psychometric function)
+### for "seen" trials
+### data from <Hanson_et_al 2008 Exp_Brain_Res RecalibrationOfPerceivedTimeAc> estimate of sensitivity to temporal order in the form of just-noticeable difference (JND) (approximately half the offset between the 27 and 73% response levels on the psychometric function)
+jnd.toBeep.seen <- 30
 
+### for "retro" trials
 jnd.toBeep.retro <- function(soa.toCue = 0, model) {
-  jnd.toBeep.seen + soa.toCue / 10 # lower sensitivity when retro-seen
+  jnd.toBeep.seen + soa.toCue / 10 # lower precision due to the degradation of the sensory memory trace over time
 }
 
-# Psychometric Functions
-
-## logistic function to fit the psychometric functions to
+## Logistic function to fit the psychometric functions to
 logistic <- function(x, mu = 0, teta = 1) {
   1 / (1 + exp(-(x - mu) / teta))
 }
 
-## psychometric function for "guess" trials
+
+## Individual Component Functions
+
+### for "guess" trials
 p.beforeBeep.guess <- function(soa.toBeep) {
   0.5 # assuming no bias
 }
 
-## psychometric function for "seen" trials
+### for "seen" trials
 p.beforeBeep.seen <- function(soa.toBeep) {
   logistic(soa.toBeep, pss.toBeep.seen, jnd.toBeep.seen)
 }
 
-## psychometric function for "retro" trials
+### for "retro" trials
 p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
   pss <- pss.toBeep.retro(soa.toCue, model)
   jnd <- jnd.toBeep.retro(soa.toCue, model)
   logistic(soa.toBeep, pss, jnd)
 }
 
-# Mixture
+## Mixture Functions
 
-## Mixture psychometric functions
-
+### with cue present
 p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model, include.guesses = TRUE) {
   proportions <- p.trials(soa.toCue, include.guesses)
   proportions$retro * p.beforeBeep.retro(soa.toBeep, soa.toCue, model) +
@@ -101,6 +111,7 @@ p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model, include.guess
   proportions$guess * p.beforeBeep.guess(soa.toBeep)
 }
 
+### no cue
 p.beforeBeep.mixture.nocue <- function(soa.toBeep, include.guesses = TRUE) {
   proportions <- p.trials.nocue(include.guesses)
   proportions$guess * p.beforeBeep.guess(soa.toBeep) +
@@ -112,11 +123,13 @@ p.beforeBeep.mixture.nocue <- function(soa.toBeep, include.guesses = TRUE) {
 ## comparer no-cue et (retro-)cue
 
 data.soa.toBeep <- seq(-400, 400, by=1)
-include.guesses <- FALSE
-# include.guesses <- TRUE
+#include.guesses <- FALSE
+include.guesses <- TRUE
 
-## Figure 1 : Mixture psychometric function
-data.soa.toCue <- 300
+## Figure 1 : Mixture psychometric function : with cue vs no cue
+### 1A : Model CA
+### 1B : Model TM
+data.soa.toCue <- -100
 quartz()
 par(mfrow=c(2, 1))
 par(oma=c(2, 0, 0, 0))
