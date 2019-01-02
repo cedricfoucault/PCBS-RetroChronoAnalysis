@@ -86,7 +86,7 @@ logistic <- function(x, mu = 0, teta = 1) {
 
 ### for "guess" trials
 p.beforeBeep.guess <- function(soa.toBeep) {
-  0.5 # assuming no bias
+  rep(0.5, length(soa.toBeep)) # assuming no bias
 }
 
 ### for "seen" trials
@@ -120,16 +120,39 @@ p.beforeBeep.mixture.nocue <- function(soa.toBeep, include.guesses = TRUE) {
 
 # Plots
 
-## comparer no-cue et (retro-)cue
-
-data.soa.toBeep <- seq(-400, 400, by=1)
+data.soa.toCue <- 300
+data.soa.toBeep <- seq(-600, 600, by=1)
 #include.guesses <- FALSE
 include.guesses <- TRUE
+models <- list(list(name="CA", color="blue"), list(name="TM", color="green"))
 
-## Figure 1 : Mixture psychometric function : with cue vs no cue
-### 1A : Model CA
-### 1B : Model TM
-data.soa.toCue <- -100
+## Individual psychometric functions
+plot.function <- function(p.function, color, title) {
+  quartz()
+  plot(data.soa.toBeep, p.function(data.soa.toBeep),
+       type="l",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       col=color,
+       main=title)
+}
+
+plot.function(p.beforeBeep.guess, "black", "Guess")
+plot.function(p.beforeBeep.seen, "black", "Seen")
+for (model in models) {
+  p.function.retro <- function(soa.toBeep) {
+    p.beforeBeep.retro(soa.toBeep, data.soa.toCue, model$name)
+  }
+  p.function.mixture <- function(soa.toBeep) {
+    p.beforeBeep.mixture(data.soa.toBeep, data.soa.toCue, model$name, include.guesses)
+  }
+  plot.function(p.function.retro, model$color, sprintf("Retro - %s", model$name))
+  plot.function(p.function.mixture, model$color, sprintf("Mixture - %s", model$name))
+}
+
+## Mixture psychometric function : with cue vs no cue
+### A : Model CA
+### B : Model TM
 quartz()
 par(mfrow=c(2, 1))
 par(oma=c(2, 0, 0, 0))
