@@ -1,0 +1,291 @@
+---
+title: "Mixture Model Analysis of Temporal Order Judgment"
+author: "Cédric Foucault"
+output:
+  html_document:
+    toc: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Description of the design
+
+### Task
+
+### Conditions
+
+### Type of trials
+
+Chaque essai a 3 issues possibles :
+1. soit la cible n’a pas été perçue consciemment ;
+2. soit la cible a été perçue consciemment directement ;
+3. soit la cible a été perçue consciemment rétrospectivement grâce à la cue.
+Dans la suite, on qualifiera ces 3 types d'essai par 1. "guess", 2. "seen", et 3. "retro"
+
+### Hypotheses
+
+Nous avons deux hypothèses alternatives :
+
+(CA)
+: Conscious Access : Il y a confusion du moment où l’on juge que la cible est apparue avec le moment où l’on en a pris conscience.
+
+(TM)
+: Time Marker : Un processus préconscient encode un marqueur temporel de la cible auquel on peut faire référence plus tard pour juger du moment où la cible est apparue, indépendemment du moment où l'on en a pris conscience.
+
+### Goal of this document
+
+## Components
+
+### PSS
+
+For "seen" trials: -10ms from Fujisaki, Shimojo, Kashino, Nishida (2004).
+
+For "retro" trials:
+
+* **(CA)** PSS proche de la cue
+* **(TM)** PSS proche de l'indice
+
+``` {r PSS}
+pss.toBeep.seen <- -10
+
+pss.toBeep.retro <- function(soa.toCue = 0, model) {
+  if (model == "CA") { # Conscious Access Model: PSS close to cue
+    pss.toBeep.seen + soa.toCue
+  } else { # Time Marker Model: PSS close to beep
+    pss.toBeep.seen # constant
+  } 
+}
+```
+
+### Slope
+
+For "seen" trials: -30ms from Hanson et al. (2008).
+
+For "retro" trials: lower precision with `soa.toCue` due to the degradation of the sensory memory trace over time.
+
+``` {r JND}
+jnd.toBeep.seen <- 30
+
+jnd.toBeep.retro <- function(soa.toCue = 0, model) {
+  jnd.toBeep.seen + soa.toCue / 10 # lower precision due to the degradation of the sensory memory trace over time
+}
+```
+
+### Functions
+
+Assimiler chaque composante à une fonction logistique.
+``` {r logistic}
+logistic <- function(x, mu = 0, teta = 1) {
+  1 / (1 + exp(-(x - mu) / teta))
+}
+```
+
+For "guess" trials:
+```{r component.guess}
+p.beforeBeep.guess <- function(soa.toBeep) {
+  rep(0.5, length(soa.toBeep)) # assuming no bias
+}
+```
+
+For "seen" trials:
+```{r component.seen}
+p.beforeBeep.seen <- function(soa.toBeep) {
+  logistic(soa.toBeep, pss.toBeep.seen, jnd.toBeep.seen)
+}
+```
+
+For "retro" trials:
+```{r component.retro}
+p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
+  pss <- pss.toBeep.retro(soa.toCue, model)
+  jnd <- jnd.toBeep.retro(soa.toCue, model)
+  logistic(soa.toBeep, pss, jnd)
+}
+```
+
+## Proportion of trials
+
+### Cue absent
+
+0.55 baseline probability to see the target in no-cue condition, from Thibault, Sergent et al. (2016).
+``` {r proportions.nocue}
+p.seen.nocue <- 0.55
+p.trials.nocue <- function(include.guesses = TRUE) {
+  p.g <- if (include.guesses) 1 - p.seen.nocue else 0
+  p.s <- 1 - p.g
+  list(guess = p.g, seen = p.s)
+}
+```
+
+### Cue present
+
+Proportion of "guess" trials:
+``` {r proportions.cue.guess}
+p.guess <- function(soa.toCue) {
+  # data from Sergent_Thibault_et_al 2016 PLOS
+  data.soa.toCue <- c(-100, 100, 400)
+  data.p.guess <-  c(0.24, 0.32, 0.39)
+  # linear interpolation of data points
+  approxfun(data.soa.toCue, data.p.guess, rule=2)(soa.toCue)
+}
+```
+
+Fraction of "retro" trials among non-guess trials (target was seen consciously):
+``` {r fraction.cue.retro}
+fraction.retro <- function(soa.toCue) {
+  if (soa.toCue >= 0) {
+    ## defined as the increase in probability to see the target from the baseline
+    (1 - p.seen.nocue - p.guess(soa.toCue)) / p.seen.nocue
+  } else {
+    0 # retroperception cannot happen when the cue appears before the target
+  }
+}
+```
+
+This leads to the following proportions:
+``` {r proportions.cue}
+p.trials <- function(soa.toCue, include.guesses = TRUE) {
+  p.g <- if (include.guesses) p.guess(soa.toCue) else 0
+  p.retro <- (1 - p.g) * fraction.retro(soa.toCue)
+  p.seen <- 1 - p.g - p.retro
+  list(guess = p.g, seen = p.seen, retro = p.retro)
+}
+```
+
+## Mixtures
+
+Cue absent:
+``` {r mixture.nocue}
+p.beforeBeep.mixture.nocue <- function(soa.toBeep, include.guesses = TRUE) {
+  proportions <- p.trials.nocue(include.guesses)
+  proportions$guess * p.beforeBeep.guess(soa.toBeep) +
+  proportions$seen * p.beforeBeep.seen(soa.toBeep)
+}
+```
+
+Cue present:
+``` {r mixture.cue}
+p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model, include.guesses = TRUE) {
+  proportions <- p.trials(soa.toCue, include.guesses)
+  proportions$retro * p.beforeBeep.retro(soa.toBeep, soa.toCue, model) +
+  proportions$seen * p.beforeBeep.seen(soa.toBeep) +
+  proportions$guess * p.beforeBeep.guess(soa.toBeep)
+}
+```
+
+## Analyses
+
+Parameters:
+```{r parameters}
+data.soa.toCue <- 300
+data.soa.toBeep <- seq(-600, 600, by=1)
+include.guesses <- TRUE
+models <- list(list(name="CA", color="blue"), list(name="TM", color="green"))
+```
+
+### Visualizing individual psychometric functions
+
+Helper:
+``` {r plot.functions.helper}
+plot.function <- function(p.function, color, title) {
+  plot(data.soa.toBeep, p.function(data.soa.toBeep),
+       type="l",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       col=color,
+       main=title)
+}
+```
+
+``` {r plot.functions}
+plot.function(p.beforeBeep.guess, "black", "Guess")
+plot.function(p.beforeBeep.seen, "black", "Seen")
+```
+``` {r.slider, include=FALSE}
+
+```
+
+``` {r.plot.function.helper.interactive}
+plot.function <- function(p.function, color, title, input.soa.toCue = data.soa.toCue) {
+  plot(data.soa.toBeep, p.function(data.soa.toBeep, input.soa.toCue),
+       type="l",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       col=color,
+       main=title)
+}
+```
+
+``` {r plot.functions.interactive}
+for (model in models) {
+  p.function.retro <- function(soa.toBeep, input.soa.toCue) {
+      p.beforeBeep.retro(soa.toBeep, input.soa.toCue, model$name)
+  }
+  plot.function(p.function.retro, model$color, sprintf("Retro - %s", model$name), data.soa.toCue)
+}
+for (model in models) {
+  p.function.mixture <- function(soa.toBeep, input.soa.toCue) {
+      p.beforeBeep.mixture(soa.toBeep, input.soa.toCue, model$name, include.guesses)
+  }
+  plot.function(p.function.mixture, model$color, sprintf("Mixture - %s", model$name), data.soa.toCue)
+}
+```
+
+### Comparing cue present / cue absent
+
+``` {r plot.comparison.cue.nocue}
+sliderInput("soa.toCue.comparison", "SOA[Target-Cue] (ms)", -200, 400, data.soa.toCue, step = 25, round = TRUE)
+plot.mixtures <- function(model, color, input.soa.toCue = data.soa.toCue) {
+  plot(data.soa.toBeep, p.beforeBeep.mixture.nocue(data.soa.toBeep, include.guesses),
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       main=sprintf("%s Model", model))
+  # lines(data.soa.toBeep, p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = data.soa.toCue, model, include.guesses),
+  #       col=color, lty="dashed")
+  lines(data.soa.toBeep, p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = input.soa.toCue, model, include.guesses),
+        col=color, lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         # c("no cue", sprintf("retro-cue : %dms", data.soa.toCue)),
+         c("no cue", sprintf("retro-cue : %dms", input.soa.toCue)),
+         col=c("black", color),
+         lty=c("dotted", "dashed"))
+}
+# TODO debug include.guesses within renderPlot
+# renderPlot({
+# plot.mixtures("CA", "blue", input$soa.toCue.comparison)
+# })
+# renderPlot({
+# plot.mixtures("TM", "green", input$soa.toCue.comparison)
+# })
+plot.mixtures("CA", "blue")
+plot.mixtures("TM", "green")
+```
+``` {r plot.comparison.cue.nocue.noguess}
+include.guesses <- FALSE
+plot.mixtures("CA", "blue")
+plot.mixtures("TM", "green")
+```
+
+<!-- ## R Markdown -->
+
+<!-- This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>. -->
+
+<!-- When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this: -->
+
+<!-- ```{r cars} -->
+<!-- summary(cars) -->
+<!-- ``` -->
+
+<!-- ## Including Plots -->
+
+<!-- You can also embed plots, for example: -->
+
+<!-- ```{r pressure, echo=FALSE} -->
+<!-- plot(pressure) -->
+<!-- ``` -->
+
+<!-- Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. -->

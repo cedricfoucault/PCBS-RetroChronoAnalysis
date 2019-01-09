@@ -172,3 +172,61 @@ plot.mixtures <- function(model, color) {
 plot.mixtures("CA", "blue")
 plot.mixtures("TM", "green")
 mtext(sprintf("include guesses : %s", if (include.guesses) "yes" else "no"), side=1, outer=TRUE)
+
+## Other Figures
+
+quartz()
+legend.strings <- c()
+soas <- c(100, 200, 300)
+for (i in 1:length(soas)) {
+  soa <- soas[i]
+  legend.strings <- c(legend.strings, sprintf("SOA(T, C) = %dms", soa))
+  if (i == 1) {
+    plot(data.soa.toBeep, p.beforeBeep.retro(data.soa.toBeep, soa, "CA"),
+         type="l",
+         xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+         ylim=c(0,1),
+         col="blue",
+         lty=2+i,
+         main="Essai rétro-perçu - Hypothèse (CA)")
+  } else {
+    lines(data.soa.toBeep, p.beforeBeep.retro(data.soa.toBeep, soa, "CA"),
+          type="l",
+          xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+          ylim=c(0,1),
+          col="blue",
+          lty=2+i)
+  }
+}
+legend("topleft", inset=.05, lwd=2,
+       legend.strings,
+       col=rep("blue", length(soas)),
+       lty=2:(2+length(soas)))
+
+quartz()
+legend.strings <- c()
+soas <- c(100, 200, 300)
+for (i in 1:length(soas)) {
+  soa <- soas[i]
+  legend.strings <- c(legend.strings, sprintf("SOA(T, C) = %dms", soa))
+  if (i == 1) {
+    plot(data.soa.toBeep, p.beforeBeep.retro(data.soa.toBeep, soa, "TM"),
+         type="l",
+         xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+         ylim=c(0,1),
+         col="green",
+         lty=2+i,
+         main="Essai rétro-perçu - Hypothèse (TM)")
+  } else {
+    lines(data.soa.toBeep, p.beforeBeep.retro(data.soa.toBeep, soa, "TM"),
+          type="l",
+          xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+          ylim=c(0,1),
+          col="green",
+          lty=2+i)
+  }
+}
+legend("topleft", inset=.05, lwd=2,
+       legend.strings,
+       col=rep("green", length(soas)),
+       lty=2:(2+length(soas)))
