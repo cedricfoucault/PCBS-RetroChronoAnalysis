@@ -1,5 +1,5 @@
 ---
-title: "Mixture Model Analysis of Temporal Order Judgment"
+title: "Modélisation et Analyse du Temporal Order Judgement"
 author: "Cédric Foucault"
 output:
   html_document:
@@ -11,33 +11,128 @@ runtime: shiny
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Description of the design
+## Introduction
 
-### Task
+### But du projet
 
-### Conditions
+Le but de ce projet est de modéliser et d'analyser les prédictions faites par deux hypothèses alternatives dans une expérience.
 
-### Type of trials
+### Description de l'expérience
 
-Chaque essai a 3 issues possibles :
-1. soit la cible n’a pas été perçue consciemment ;
-2. soit la cible a été perçue consciemment directement ;
-3. soit la cible a été perçue consciemment rétrospectivement grâce à la cue.
-Dans la suite, on qualifiera ces 3 types d'essai par 1. "guess", 2. "seen", et 3. "retro"
+L'expérience reprend le paradigme de la **rétroperception**, où l'on présente successivement une cible visuelle (target) au seuil de contraste, puis un indice d'attention spatial exogène (cue). On a montré que la présence d'un indice valide peut induire une prise de conscience de la cible  qui n'aurait pas eu lieu en l'absence de l'indice, et ce jusqu'à 400 ms après l'apparition de la cible. On ajoute à ce paradigme une tâche de *temporal order judgement* (TOJ), car on s'intéresse à l'effet de la rétroperception sur la perception du temps.
 
-### Hypotheses
+Chaque essai se déroule selon la séquence ci-dessous. Deux stimuli sont présentés successivement : la cible, et un beep. Ils sont séparés par un intervalle de temps SOA(T, B) qui peut être positif ou négatif (lorsque cet intervalle est positif, le son est joué après la cible). Dans le code, nous y ferons référence par `soa.toBeep`. La cible peut être accompagnée ou non d’un indice (cue), qui se produit à un intervalle de temps SOA(T, C) auquel nous ferons référence `soa.toCue`. L'écran de réponse pour la tâche de TOJ apparaît après le dernier des deux stimuli ou de l’indice. Le sujet doit sélectionner à la souris l’une des deux options : la cible est apparue “avant” ou “après” le beep.
 
-Nous avons deux hypothèses alternatives :
+```{r deroulement-essai, echo=FALSE, fig.cap="Déroulement d'un essai", out.width = '50%'}
+knitr::include_graphics("./Figures/fig_deroulement_essai.png")
+```
 
-(CA)
-: Conscious Access : Il y a confusion du moment où l’on juge que la cible est apparue avec le moment où l’on en a pris conscience.
+### Hypothèses
 
-(TM)
-: Time Marker : Un processus préconscient encode un marqueur temporel de la cible auquel on peut faire référence plus tard pour juger du moment où la cible est apparue, indépendemment du moment où l'on en a pris conscience.
+L’objectif premier de l'expérience est déterminer si, dans la rétroperception, il y a confusion ou indépendance du moment où l’on juge que la cible est apparue avec le moment où l’on en a pris conscience. Nous avons deux hypothèses alternatives :
 
-### Goal of this document
+**(CA)** Hypothèse *Conscious Access* : Il y a confusion du jugement du temps où la cible est apparue avec le moment où l'on a pris conscience de la cible. Ainsi, selon cette hypothèse, lors de la rétroperception, puisque l’instant où la cible accède à la conscience est retardée, la valeur du jugement temporel qui lui est attribuée est elle aussi être retardée, et ce retard est proportionnel au SOA entre la cible et l'indice.
+
+**(TM)** Hypothèse *Time Marker* : Un processus de traitement préconscient encode un marqueur temporel de la cible qui sert de référence subjective plus tard pour juger de som moment d'apparition. Ainsi, selon cette hypothèse, l’instant où la cible est présentée ne devrait pas induire de décalage proportionnel au SOA sur le jugement temporel en moyenne.
+
+### Types d'essais
+
+En présence de la cue, chaque essai a trois issues possibles : soit la cible n’a pas été perçue consciemment, soit la cible a été perçue consciemment directement, soit la cible a été perçue consciemment rétrospectivement grâce à la cue. Nous ferons référence ces trois types d’essais respectivement par `guess`, `seen`, et `retro`.
+
+En l'absence de cue, condition que nous appellerons `nocue`, nous n'avons que les essais `guess` et `seen`.
 
 ## Components
+
+### Helper
+
+Nous allons modéliser la fonction psychométrique, qui lie la probabilité que le sujet réponde que la cible est apparue avant le beep `p.beforeBeep` à l'intervalle de temps entre la cible et le beep `soa.toBeep`. 
+
+On prédit différentes fonctions la condition (avec cue ou `nocue`), le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue `soa.toCue`.
+
+On réutilise les paramètres et la fonction helper suivante pour visualiser les fonctions psychométriques au fur et à mesure :
+``` {r helpers}
+data.soa.toCue <- 300
+data.soa.toBeep <- seq(-600, 600, by=1)
+include.guesses <- TRUE
+models <- list(list(name="CA", color="blue"), list(name="TM", color="green"))
+
+plot.function <- function(p.function, color, title) {
+  plot(data.soa.toBeep, p.function(data.soa.toBeep),
+       type="l",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       col=color,
+       main=title)
+}
+```
+
+Lors d’un essai *guess*, on s’attend à ce que le sujet réponde au hasard : la fonction psychométrique est constante, à une valeur de 50% en supposant un biais nul :
+```{r p.beforeBeep.guess}
+p.beforeBeep.guess <- function(soa.toBeep) {
+  rep(0.5, length(soa.toBeep)) # assuming no bias
+}
+```
+
+``` {r component.guess.plot}
+plot.function(p.beforeBeep.guess, "black", "Guess")
+```
+
+
+Lors d’un essai *seen*, on s’attend à une distribution similaire à celle observée dans une tâche simple de TOJ audio-visuelle. S’inspirant de la méthode de Hanson et al. (2008), on modélise la fonction psychométrique selon une fonction logistique de la forme : 
+``` {r logistic.function}
+logistic <- function(x, mu = 0, teta = 1) {
+  1 / (1 + exp(-(x - mu) / teta))
+}
+```
+où `μ` est le point de simultanéité subjective (`pss`), et `teta` la pente (équivalente au `jnd` pour just noticeable difference). On les valeurs ci-dessous d'après (Fujisaki et al., 2004; Hanson et al., 2008) :
+``` {r component.seen.parameters}
+pss.toBeep.seen <- -10
+jnd.toBeep.seen <- 30
+```
+Ainsi : 
+```{r p.beforeBeep.seen}
+p.beforeBeep.seen <- function(soa.toBeep) {
+  logistic(soa.toBeep, pss.toBeep.seen, jnd.toBeep.seen)
+}
+```
+``` {r.component.seen.plot}
+plot.function(p.beforeBeep.seen, "black", "Seen")
+```
+
+Lors d’un essai *retro*, le `pss` que l’on prédit diffère selon l’hypothèse dans laquelle on se place : selon (CA), il serait proche du temps de la cue, selon (TM), il serait proche du temps du beep.
+``` {r pss.toBeep.retro}
+pss.toBeep.retro <- function(soa.toCue = 0, model) {
+  if (model == "CA") { # Conscious Access Model: PSS close to cue
+    pss.toBeep.seen + soa.toCue
+  } else { # Time Marker Model: PSS close to beep
+    pss.toBeep.seen # constant
+  } 
+}
+```
+Pour la pente, on prédit une valeur un peu plus faible que lors d'un essai seen dans les deux cas, et d'autant plus faible que le `soa.toCue` est grand, car la dégradation avec le temps de la trace sensorielle en mémoire devrait induire plus de variabilité.
+``` {r jnd.toBeep.retro}
+jnd.toBeep.retro <- function(soa.toCue = 0, model) {
+  jnd.toBeep.seen + soa.toCue / 10 # lower precision due to the degradation of the sensory memory trace over time
+}
+```
+Ceci nous donne deux fonctions psychométriques différentes pour les essais *retro*, selon l'hypothèse admise.
+``` {r.p.beforeBeep.retro}
+p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
+  pss <- pss.toBeep.retro(soa.toCue, model)
+  jnd <- jnd.toBeep.retro(soa.toCue, model)
+  logistic(soa.toBeep, pss, jnd)
+}
+```
+``` {r.component.retro.plot}
+for (model in models) {
+  p.function.retro <- function(soa.toBeep) {
+      p.beforeBeep.retro(soa.toBeep, data.soa.toCue, model$name)
+  }
+  plot.function(p.function.retro, model$color, sprintf("Retro - %s - SOA(target-cue): %d ms)", model$name, data.soa.toCue))
+}
+```
+
+<!--
 
 ### PSS
 
@@ -270,6 +365,8 @@ plot.mixtures("CA", "blue")
 plot.mixtures("TM", "green")
 ```
 
+## Conclusion
+
 <!-- ## R Markdown -->
 
 <!-- This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>. -->
@@ -289,3 +386,5 @@ plot.mixtures("TM", "green")
 <!-- ``` -->
 
 <!-- Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. -->
+
+-->
