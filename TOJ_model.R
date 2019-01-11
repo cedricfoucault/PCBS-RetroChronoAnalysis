@@ -21,21 +21,24 @@ p.guess <- function(soa.toCue) {
   approxfun(data.soa.toCue, data.p.guess, rule=2)(soa.toCue)
 }
 
-## fraction of "retro" trials among both "seen" and "retro" trials
-fraction.retro <- function(soa.toCue) {
+### proportion of trials, with cue present
+p.trials <- function(soa.toCue, include.guesses = TRUE) {
+  p.g <- if (include.guesses) p.guess(soa.toCue) else 0
   if (soa.toCue >= 0) {
-    ## defined as the increase in probability to see the target from the baseline
-    (1 - p.seen.nocue - p.guess(soa.toCue)) / p.seen.nocue
+    p.seen <- p.seen.nocue
+    p.retro <- 1 - p.g - p.seen ## defined as the increase in probability to see the target from the baseline
   } else {
-    0 # retroperception cannot happen when the cue appears before the target
+    p.seen <- 1 - p.g
+    p.retro <- 0 # by definition, retroperception cannot happen when the cue appears before the target
   }
+  list(guess = p.g, seen = p.seen, retro = p.retro)
 }
 
 ### with cue present
 p.trials <- function(soa.toCue, include.guesses = TRUE) {
   p.g <- if (include.guesses) p.guess(soa.toCue) else 0
-  p.retro <- (1 - p.g) * fraction.retro(soa.toCue)
-  p.seen <- 1 - p.g - p.retro
+  p.seen <- p.seen.nocue
+  p.retro <- 1 - p.g - p.seen
   list(guess = p.g, seen = p.seen, retro = p.retro)
 }
 

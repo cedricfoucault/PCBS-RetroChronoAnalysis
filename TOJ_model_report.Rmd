@@ -39,9 +39,9 @@ L’objectif premier de l'expérience est déterminer si, dans la rétropercepti
 
 En présence de la cue, chaque essai a trois issues possibles : soit la cible n’a pas été perçue consciemment, soit la cible a été perçue consciemment directement, soit la cible a été perçue consciemment rétrospectivement grâce à la cue. Nous ferons référence ces trois types d’essais respectivement par `guess`, `seen`, et `retro`.
 
-En l'absence de cue, condition que nous appellerons `nocue`, nous n'avons que les essais `guess` et `seen`.
+En l'absence de cue, condition que nous appellerons `nocue`, nous n'avons que des essais de type `guess` et `seen`.
 
-## Components
+## Fonctions psychométriques composantes
 
 ### Helper
 
@@ -66,6 +66,8 @@ plot.function <- function(p.function, color, title) {
 }
 ```
 
+### Composantes pour chaque type d'essai
+
 Lors d’un essai *guess*, on s’attend à ce que le sujet réponde au hasard : la fonction psychométrique est constante, à une valeur de 50% en supposant un biais nul :
 ```{r p.beforeBeep.guess}
 p.beforeBeep.guess <- function(soa.toBeep) {
@@ -76,7 +78,6 @@ p.beforeBeep.guess <- function(soa.toBeep) {
 ``` {r component.guess.plot}
 plot.function(p.beforeBeep.guess, "black", "Guess")
 ```
-
 
 Lors d’un essai *seen*, on s’attend à une distribution similaire à celle observée dans une tâche simple de TOJ audio-visuelle. S’inspirant de la méthode de Hanson et al. (2008), on modélise la fonction psychométrique selon une fonction logistique de la forme : 
 ``` {r logistic.function}
@@ -131,6 +132,108 @@ for (model in models) {
   plot.function(p.function.retro, model$color, sprintf("Retro - %s - SOA(target-cue): %d ms)", model$name, data.soa.toCue))
 }
 ```
+
+## Fonctions psychométriques résultantes : Mixture Model
+
+On modélise les fonctions psychométriques résultantes par une distribution de mélange (mixture model) résultant de la combinaison des composantes décrites ci-dessus, pondérée par les probabilités de chaque type d’essai. Pour calculer ces probabilités, on se base sur les résultats de l'expérience de rétroperception déjà menée par Thibault, Sergent et al. (2016).
+
+En condition `nocue`, le seuil de contraste auquel on se place donne une probabilité de 0.55 de voir consciemment la cible, ce qui nous donne directement les probabilités qu'un essai soit de type *guess* ou de type *seen* :
+``` {r p.trials.nocue}
+p.seen.nocue <- 0.55 # data from Thibault, Sergent et al. (2016)
+p.trials.nocue <- function(include.guesses = TRUE) {
+  p.g <- if (include.guesses) 1 - p.seen.nocue else 0
+  p.s <- 1 - p.g
+  list(guess = p.g, seen = p.s)
+}
+```
+
+En condition avec cue, la probabilité de voir consciemment la cible dépend du SOA entre target et cue. On interpole les données obtenues expérimentalement pour obtenir la probabilité qu'un essai `p.guess` soit de type *guess*, et on en déduit les autres probabilités comme suit :
+``` {r p.trials}
+p.guess <- function(soa.toCue) {
+  # data from Sergent_Thibault_et_al 2016 PLOS
+  data.soa.toCue <- c(-100, 100, 400)
+  data.p.guess <-  c(0.24, 0.32, 0.39)
+  # linear interpolation of data points
+  approxfun(data.soa.toCue, data.p.guess, rule=2)(soa.toCue)
+}
+
+p.trials <- function(soa.toCue, include.guesses = TRUE) {
+  p.g <- if (include.guesses) p.guess(soa.toCue) else 0
+  if (soa.toCue >= 0) {
+    ## lorsque la cue apparaît après la cible, la probabilité de voir la cible directement est la même qu'en condition nocue car la cue ne peut avoir qu'un effet rétrospectif
+    p.seen <- p.seen.nocue
+    p.retro <- 1 - p.g - p.seen
+  } else {
+    ## lorsque la cue apparaît avant la cible, on a, par définition, pas de retro
+    p.seen <- 1 - p.g
+    p.retro <- 0
+  }
+  list(guess = p.g, seen = p.seen, retro = p.retro)
+}
+```
+
+On obtient ainsi les fonctions psychométriques résultantes…
+
+* Pour la condition nocue :
+``` {r plot.function.mixture.nocue}
+p.beforeBeep.mixture.nocue <- function(soa.toBeep, include.guesses = TRUE) {
+  proportions <- p.trials.nocue(include.guesses)
+  proportions$guess * p.beforeBeep.guess(soa.toBeep) +
+  proportions$seen * p.beforeBeep.seen(soa.toBeep)
+}
+plot.function(p.beforeBeep.mixture.nocue, "black", "Mixture - No Cue")
+```
+
+* Pour la condition avec cue :
+``` {r plot.function.mixture.cue}
+p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model, include.guesses = TRUE) {
+  proportions <- p.trials(soa.toCue, include.guesses)
+  proportions$retro * p.beforeBeep.retro(soa.toBeep, soa.toCue, model) +
+  proportions$seen * p.beforeBeep.seen(soa.toBeep) +
+  proportions$guess * p.beforeBeep.guess(soa.toBeep)
+}
+for (model in models) {
+  p.function.mixture <- function(soa.toBeep) {
+      p.beforeBeep.mixture(soa.toBeep, data.soa.toCue, model$name, include.guesses)
+  }
+  plot.function(p.function.mixture, model$color, sprintf("Mixture - %s", model$name))
+}
+```
+
+## Comparaisons des fonctions et analyses
+
+### Comparaison cue present / absent selon l'hypothèse avec SOA interactif
+
+``` {r plot.comparison.cue.nocue.interactive}
+sliderInput("soa.toCue.comparison", "SOA[Target-Cue] (ms)", -100, 400, data.soa.toCue, step = 25, round = TRUE)
+
+plot.mixtures <- function(model, color, input.soa.toCue = data.soa.toCue) {
+  plot(data.soa.toBeep,
+       p.beforeBeep.mixture.nocue(data.soa.toBeep, TRUE),
+       type="l", col="black", lty="dotted",
+       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       ylim=c(0,1),
+       main=sprintf("%s Model", model))
+  lines(data.soa.toBeep,
+        p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = input.soa.toCue, model, include.guesses),
+        col=color, lty="dashed")
+  legend("topleft", inset=.05, lwd=2,
+         c("no cue", sprintf("with cue : %dms", input.soa.toCue)),
+         col=c("black", color),
+         lty=c("dotted", "dashed"))
+}
+
+renderPlot({
+plot.mixtures("CA", "blue", input$soa.toCue.comparison)
+})
+renderPlot({
+plot.mixtures("TM", "green", input$soa.toCue.comparison)
+})
+```
+
+<!-- TODO debug include.guesses within renderPlot -->
+
+## Conclusion
 
 <!--
 
@@ -360,7 +463,7 @@ plot.mixtures("CA", "blue")
 plot.mixtures("TM", "green")
 ```
 ``` {r plot.comparison.cue.nocue.noguess}
-include.guesses <- FALSE
+# include.guesses <- FALSE
 plot.mixtures("CA", "blue")
 plot.mixtures("TM", "green")
 ```
