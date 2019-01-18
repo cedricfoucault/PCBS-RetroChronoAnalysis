@@ -37,9 +37,9 @@ L’objectif premier de l'expérience est déterminer si, dans la rétropercepti
 
 ### Types d'essais
 
-En présence de la cue, chaque essai a trois issues possibles : soit la cible n’a pas été perçue consciemment, soit la cible a été perçue consciemment directement, soit la cible a été perçue consciemment rétrospectivement grâce à la cue. Nous ferons référence ces trois types d’essais respectivement par `guess`, `seen`, et `retro`.
+En présence de la cue, condition que nous appellerons "avec-cue", chaque essai a trois issues possibles : soit la cible n’a pas été perçue consciemment, soit la cible a été perçue consciemment directement, soit la cible a été perçue consciemment rétrospectivement grâce à la cue. Nous ferons référence ces trois types d’essais respectivement par `guess`, `seen`, et `retro`.
 
-En l'absence de cue, condition que nous appellerons `nocue`, nous n'avons que des essais de type `guess` et `seen`.
+En l'absence de cue, condition que nous appellerons "no-cue", nous n'avons que des essais de type `guess` et `seen`.
 
 ## Fonctions psychométriques composantes
 
@@ -47,7 +47,7 @@ En l'absence de cue, condition que nous appellerons `nocue`, nous n'avons que de
 
 Nous allons modéliser la fonction psychométrique, qui lie la probabilité que le sujet réponde que la cible est apparue avant le beep `p.beforeBeep` à l'intervalle de temps entre la cible et le beep `soa.toBeep`. 
 
-On prédit différentes fonctions la condition (avec cue ou `nocue`), le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue `soa.toCue`.
+On prédit différentes fonctions la condition (avec-cue ou no-cue), le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue `soa.toCue`.
 
 On réutilise les paramètres et la fonction helper ci-dessous pour visualiser les fonctions psychométriques au fur et à mesure :
 ``` {r helpers}
@@ -150,13 +150,13 @@ plot.function.retro(model.TM)
 
 On modélise les fonctions psychométriques résultantes par une distribution de mélange (mixture model) résultant de la combinaison des composantes décrites ci-dessus, pondérée par les probabilités de chaque type d’essai. Pour calculer ces probabilités, on se base sur les résultats de l'expérience de rétroperception déjà menée par Thibault, Sergent et al. (2016).
 
-En condition `nocue`, le seuil de contraste auquel on se place donne une probabilité de 0.55 de voir consciemment la cible, ce qui nous donne directement les probabilités qu'un essai soit de type *guess* ou de type *seen* :
+En condition no-cue, le seuil de contraste auquel on se place donne une probabilité de 0.55 de voir consciemment la cible, ce qui nous donne directement les probabilités qu'un essai soit de type *guess* ou de type *seen* :
 ``` {r p.trials.nocue}
 p.seen.nocue <- 0.55 # data from Thibault, Sergent et al. (2016)
 p.trials.nocue <- list(guess = 1 - p.seen.nocue, seen = p.seen.nocue)
 ```
 
-En condition avec cue, la probabilité de voir consciemment la cible dépend du SOA entre target et cue. On interpole les données obtenues expérimentalement pour obtenir la probabilité qu'un essai `p.guess` soit de type *guess*, et on en déduit les autres probabilités comme suit :
+En condition avec-cue, la probabilité de voir consciemment la cible dépend du SOA entre target et cue. On interpole les données obtenues expérimentalement pour obtenir la probabilité qu'un essai `p.guess` soit de type *guess*, et on en déduit les autres probabilités comme suit :
 ``` {r p.trials}
 p.guess <- function(soa.toCue) {
   # data from Sergent_Thibault_et_al 2016 PLOS
@@ -183,7 +183,7 @@ p.trials <- function(soa.toCue) {
 
 On obtient ainsi les fonctions psychométriques résultantes…
 
-* Pour la condition nocue :
+* Pour la condition no-cue :
 ``` {r p.beforeBeep.mixture.nocue}
 p.beforeBeep.mixture.nocue <- function(soa.toBeep) {
   proportions <- p.trials.nocue
@@ -193,10 +193,10 @@ p.beforeBeep.mixture.nocue <- function(soa.toBeep) {
 ```
 
 ``` {r plot.function.mixture.nocue}
-plot.function(p.beforeBeep.mixture.nocue, "black", "Mixture - No Cue")
+plot.function(p.beforeBeep.mixture.nocue, "black", "Mixture - no-cue")
 ```
 
-* Pour la condition avec cue :
+* Pour la condition avec-cue :
 ``` {r p.function.mixture.cue}
 p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model) {
   proportions <- p.trials(soa.toCue)
@@ -220,9 +220,9 @@ plot.function.mixture(model.CA)
 plot.function.mixture(model.TM)
 ```
 
-## Comparaisons des fonctions et analyses
+## Comparaison avec-cue vs. no-cue en fonction du SOA cue-target selon l'hypothèse admise
 
-### Comparaison cue present / absent selon l'hypothèse avec SOA interactif
+Nous allons ici comparer la fonction psychométrique de la condition avec-cue avec celle de la condition no-cue, et voir comment cette comparaison évolue en fonction du SOA[cue-target] en le modifiant de façon interactive. Ceci correspond correspond aux observations que l'on mesurerait empiriquement.
 
 ``` {r plot.comparison.helper}
 plot.mixtures <- function(model, input.soa.toCue = data.soa.toCue) {
@@ -241,11 +241,13 @@ plot.mixtures <- function(model, input.soa.toCue = data.soa.toCue) {
         col=color, lty=lty)
   mtext(subtitle)
   legend("topleft", inset=.05, lwd=2,
-         c("no cue", "with cue"),
+         c("no-cue", "with-cue"),
          col=c("black", color),
          lty=c("dotted", lty))
 }
 ```
+
+On utilise Shiny pour modifier le SOA[target-cue] de façon interactive et voir son effet sur les graphes.
 
 ``` {r plot.comparison.cue.nocue.interactive}
 sliderInput("soa.toCue.comparison", "SOA[Target-Cue] (ms)", -100, 400, data.soa.toCue, step = 25, round = TRUE)
@@ -254,6 +256,25 @@ renderPlot({ plot.mixtures(model.CA, input$soa.toCue.comparison) })
 renderPlot({ plot.mixtures(model.TM, input$soa.toCue.comparison) })
 ```
 
+## Analyse
+
+On voit ci-dessus que, sous l'hypothèse CA, pour les cue avec SOA[target-cue] positifs, on observe sur la fonction psychométrique les différences suivantes entre la condition "avec-cue" et celle de la condition "no-cue" :
+
+- une asymétrie en avec-cue qu'on ne retrouve pas en no-cue, qu'on peut quantifier par une mesure de *skewness*
+- une saturation qui est atteinte plus tard que celle de la condition no-cue (ex. à environ 400 ms avec-cue contre 50 ms no-cue, pour un SOA de 300 ms)
+- une diminution de la probabilité de réponse “T < B” dans l’intervalle [`pss.toBeep.seen` ; `pss.toBeep.seen + soa.toCue`] qu'on a pas en no-cue
+
+De plus, ces différences sont d'autant plus importantes que le SOA[target-cue] est grand.
+
+Sous l'hypothèse TM, on observe aucune de ces différences.
+
+Ainsi, nous pourrions tester lequel des deux modèles décrit le mieux nos données en manipulant expérimentalement le SOA[target-cue], en calculant les différences mentionnées et en observant leur évolution en fonction du SOA.
+
 ## Conclusion
 
+Ce projet a été l'occasion pour moi d'apprendre R et R Markdown. Je ne les avais jamais utilisés auparavant.
+
+L'écriture du rapport m'a forcé à rendre mon code plus lisible et plus simple, à utiliser une approche plus basée sur des structures fonctionnelles que des structures impératives et à minimiser les dépendences (pas de variable globale, injection de dépendences dans les fonctions).
+
+Cela m'a aussi appris à écrire un rapport d'analyse de données partageable qui combine code, visualisations et explications. Avant le cours d'Info 2, je n'avais jamais vu de tels documents scientifiques et je ne savais pas qu'il existait des outils comme R Markdown pour les produire aussi facilement. Je trouve cela "assez génial" ! :-)
 
