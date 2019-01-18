@@ -49,7 +49,7 @@ Nous allons modéliser la fonction psychométrique, qui lie la probabilité que 
 
 On prédit différentes fonctions la condition (avec cue ou `nocue`), le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue `soa.toCue`.
 
-On réutilise les paramètres et la fonction helper suivante pour visualiser les fonctions psychométriques au fur et à mesure :
+On réutilise les paramètres et la fonction helper ci-dessous pour visualiser les fonctions psychométriques au fur et à mesure :
 ``` {r helpers}
 data.soa.toCue <- 300
 data.soa.toBeep <- seq(-600, 600, by=1)
@@ -62,13 +62,14 @@ model.TM <- list(
   color = "green"
 )
 
-plot.function <- function(p.function, color, title) {
+plot.function <- function(p.function, color, title, subtitle="") {
   plot(data.soa.toBeep, p.function(data.soa.toBeep),
        type="l",
-       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       xlab="SOA[Target-Beep] (ms)", ylab="P(\"T < B\")",
        ylim=c(0,1),
        col=color,
        main=title)
+  mtext(subtitle)
 }
 ```
 
@@ -134,8 +135,9 @@ p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
 ``` {r.component.retro.plot.helper}
 plot.function.retro <- function(model) {
   p.function.retro <- function(soa.toBeep) { p.beforeBeep.retro(soa.toBeep, data.soa.toCue, model) }
-  title <- sprintf("Retro - %s - SOA(target-cue): %d ms", model$name, data.soa.toCue)
-  plot.function(p.function.retro, model$color, title)
+  title <- sprintf("Retro - %s", model$name, data.soa.toCue)
+  subtitle <- sprintf("SOA[Target-Cue] = %d ms", data.soa.toCue)
+  plot.function(p.function.retro, model$color, title, subtitle)
 }
 ```
 
@@ -203,11 +205,13 @@ p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model) {
   proportions$guess * p.beforeBeep.guess(soa.toBeep)
 }
 ```
+
 ``` {r.plot.function.mixture.cue.helper}
 plot.function.mixture <- function(model) {
   p.function.mixture <- function(soa.toBeep) { p.beforeBeep.mixture(soa.toBeep, data.soa.toCue, model) }
   title <- sprintf("Mixture - %s", model$name)
-  plot.function(p.function.mixture, model$color, title)
+  subtitle <- sprintf("SOA[Target-Cue] = %d ms", data.soa.toCue)
+  plot.function(p.function.mixture, model$color, title, subtitle)
 }
 ```
 
@@ -223,19 +227,21 @@ plot.function.mixture(model.TM)
 ``` {r plot.comparison.helper}
 plot.mixtures <- function(model, input.soa.toCue = data.soa.toCue) {
   title <- sprintf("%s Model", model$name)
+  subtitle <- sprintf("SOA[Target-Cue] = %d ms", input.soa.toCue)
   color <- model$color
   lty <- "dashed"
   plot(data.soa.toBeep,
        p.beforeBeep.mixture.nocue(data.soa.toBeep),
        type="l", col="black", lty="dotted",
-       xlab="Target-to-Beep SOA (ms)", ylab="P(\"T < B\")",
+       xlab="SOA[Target-Beep] (ms)", ylab="P(\"T < B\")",
        ylim=c(0,1),
        main=title)
   lines(data.soa.toBeep,
         p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = input.soa.toCue, model),
         col=color, lty=lty)
+  mtext(subtitle)
   legend("topleft", inset=.05, lwd=2,
-         c("no cue", sprintf("with cue : %dms", input.soa.toCue)),
+         c("no cue", "with cue"),
          col=c("black", color),
          lty=c("dotted", lty))
 }
