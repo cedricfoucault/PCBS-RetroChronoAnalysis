@@ -129,7 +129,7 @@ for (model in models) {
   p.function.retro <- function(soa.toBeep) {
       p.beforeBeep.retro(soa.toBeep, data.soa.toCue, model$name)
   }
-  plot.function(p.function.retro, model$color, sprintf("Retro - %s - SOA(target-cue): %d ms)", model$name, data.soa.toCue))
+  plot.function(p.function.retro, model$color, sprintf("Retro - %s - SOA(target-cue): %d ms", model$name, data.soa.toCue))
 }
 ```
 
