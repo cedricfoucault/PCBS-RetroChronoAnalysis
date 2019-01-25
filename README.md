@@ -22,7 +22,7 @@ Niveau avancé de programmation en général. Par contre, je n'avais jamais util
 
 *What you learned while working for this class (throught the lectures and/or the project):*
 
-Ce projet a été l'occasion pour moi d'apprendre R et R Markdown et de les appliquer à un projet d'analyse scientifique expérimental.
+Ce projet a été l'occasion pour moi d'apprendre R et R Markdown et de les appliquer à un projet d'analyse scientifique expérimentale.
 
 L'écriture du rapport m'a forcé à rendre mon code plus lisible et plus simple, à utiliser une approche plus basée sur des structures fonctionnelles que des structures impératives (modélisation par des fonctions plutôt que par des matrices, suppression des boucles for) et à minimiser les dépendences (pas de variable globale, injection de dépendences dans les fonctions).
 

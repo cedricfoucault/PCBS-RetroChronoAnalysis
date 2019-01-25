@@ -19,9 +19,9 @@ Le but de ce projet est de modéliser et d'analyser les prédictions faites par 
 
 ### Description de l'expérience
 
-L'expérience reprend le paradigme de la **rétroperception**, où l'on présente successivement une cible visuelle (target) au seuil de contraste, puis un indice d'attention spatial exogène (cue). On a montré que la présence d'un indice valide peut induire une prise de conscience de la cible  qui n'aurait pas eu lieu en l'absence de l'indice, et ce jusqu'à 400 ms après l'apparition de la cible. On ajoute à ce paradigme une tâche de *temporal order judgement* (TOJ), car on s'intéresse à l'effet de la rétroperception sur la perception du temps.
+L'expérience reprend le paradigme de la **rétroperception**, où l'on présente successivement une cible visuelle (target) au seuil de contraste, puis un indice d'attention spatial exogène (cue). Sergent et al. (2013) ont montré que la présence d'un indice valide peut induire une prise de conscience de la cible  qui n'aurait pas eu lieu en l'absence de l'indice, et ce jusqu'à 400 ms après l'apparition de la cible. On ajoute à ce paradigme une tâche de *Temporal Order Judgement* (TOJ), car on s'intéresse à l'effet de la rétroperception sur la perception du temps.
 
-Chaque essai se déroule selon la séquence ci-dessous. Deux stimuli sont présentés successivement : la cible, et un beep. Ils sont séparés par un intervalle de temps SOA(T, B) qui peut être positif ou négatif (lorsque cet intervalle est positif, le son est joué après la cible). Dans le code, nous y ferons référence par `soa.toBeep`. La cible peut être accompagnée ou non d’un indice (cue), qui se produit à un intervalle de temps SOA(T, C) auquel nous ferons référence `soa.toCue`. L'écran de réponse pour la tâche de TOJ apparaît après le dernier des deux stimuli ou de l’indice. Le sujet doit sélectionner à la souris l’une des deux options : la cible est apparue “avant” ou “après” le beep.
+Chaque essai se déroule selon la séquence ci-dessous. Deux stimuli sont présentés successivement : la cible et un beep. Ils sont séparés par un intervalle de temps SOA(T, B) qui peut être positif ou négatif (lorsque cet intervalle est positif, le son est joué après la cible). Dans le code, nous y ferons référence par `soa.toBeep`. La cible peut être accompagnée ou non d’un indice (cue), qui se produit à un intervalle de temps SOA(T, C) auquel nous ferons référence par `soa.toCue`. L'écran de réponse pour la tâche de TOJ apparaît après le dernier des deux stimuli ou de l’indice. Le sujet doit sélectionner à la souris l’une des deux options : la cible est apparue “avant” ou “après” le beep.
 
 ```{r deroulement-essai, echo=FALSE, fig.cap="Déroulement d'un essai", out.width = '50%'}
 knitr::include_graphics("./Figures/fig_deroulement_essai.png")
@@ -43,16 +43,16 @@ En l'absence de cue, condition que nous appellerons "no-cue", nous n'avons que d
 
 ## Fonctions psychométriques composantes
 
-### Helper
-
 Nous allons modéliser la fonction psychométrique, qui lie la probabilité que le sujet réponde que la cible est apparue avant le beep `p.beforeBeep` à l'intervalle de temps entre la cible et le beep `soa.toBeep`. 
 
-On prédit différentes fonctions la condition (avec-cue ou no-cue), le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue `soa.toCue`.
+On prédit différentes fonctions élémentaires selon la condition, le type d'essai, l'hypothèse que l'on admet, et l'intervalle de temps entre la cible et la cue. Ces fonctions nous serviront à calculer la fonction résultante où les essais sont mélangés et de type inconnu a priori.
 
-On réutilise les paramètres et la fonction helper ci-dessous pour visualiser les fonctions psychométriques au fur et à mesure :
+### Helper
+
+Afin de visualiser les fonctions psychométriques au fur et à mesure que nous les construisons, nous allons réutiliser les paramètres et la fonction helper ci-dessous :
 ``` {r helpers}
-data.soa.toCue <- 300
-data.soa.toBeep <- seq(-600, 600, by=1)
+soa.toCue.default <- 300
+soa.toBeep.levels <- seq(-600, 600, by=5)
 model.CA <- list(
   name = "CA",
   color = "blue"
@@ -63,7 +63,7 @@ model.TM <- list(
 )
 
 plot.function <- function(p.function, color, title, subtitle="") {
-  plot(data.soa.toBeep, p.function(data.soa.toBeep),
+  plot(soa.toBeep.levels, p.function(soa.toBeep.levels),
        type="l",
        xlab="SOA[Target-Beep] (ms)", ylab="P(\"T < B\")",
        ylim=c(0,1),
@@ -86,13 +86,13 @@ p.beforeBeep.guess <- function(soa.toBeep) {
 plot.function(p.beforeBeep.guess, "black", "Guess")
 ```
 
-Lors d’un essai *seen*, on s’attend à une distribution similaire à celle observée dans une tâche simple de TOJ audio-visuelle. S’inspirant de la méthode de Hanson et al. (2008), on modélise la fonction psychométrique selon une fonction logistique de la forme : 
+Lors d’un essai *seen*, on s’attend à une distribution similaire à celle observée dans une tâche simple de TOJ audio-visuelle. En s’inspirant de la méthode de Hanson et al. (2008), on modélise la fonction psychométrique selon une fonction logistique de la forme : 
 ``` {r logistic.function}
 logistic <- function(x, mu = 0, teta = 1) {
   1 / (1 + exp(-(x - mu) / teta))
 }
 ```
-où `μ` est le point de simultanéité subjective (`pss`), et `teta` la pente (équivalente au `jnd` pour just noticeable difference). On les valeurs ci-dessous d'après (Fujisaki et al., 2004; Hanson et al., 2008) :
+où `μ` est le point de simultanéité subjective (`pss`), et `teta` la pente (équivalente au `jnd` pour just noticeable difference). On prend les valeurs ci-dessous d'après (Fujisaki et al., 2004; Hanson et al., 2008) :
 ``` {r component.seen.parameters}
 pss.toBeep.seen <- -10
 jnd.toBeep.seen <- 30
@@ -117,7 +117,7 @@ pss.toBeep.retro <- function(soa.toCue = 0, model) {
   } 
 }
 ```
-Pour la pente, on prédit une valeur un peu plus faible que lors d'un essai seen dans les deux cas, et d'autant plus faible que le `soa.toCue` est grand, car la dégradation avec le temps de la trace sensorielle en mémoire devrait induire plus de variabilité.
+Pour la `jnd`, dans les deux hypothèses, on prédit que le déclin de la trace sensorielle récupérée à l’apparition de l’indice cause une diminution de la précision et donc du `jnd` par rapport à un essai seen, diminution d’autant plus grande que le `soa.toCue` est grand.
 ``` {r jnd.toBeep.retro}
 jnd.toBeep.retro <- function(soa.toCue = 0, model) {
   jnd.toBeep.seen + soa.toCue / 10 # lower precision due to the degradation of the sensory memory trace over time
@@ -133,17 +133,19 @@ p.beforeBeep.retro <- function(soa.toBeep, soa.toCue = 0, model) {
 ```
 
 ``` {r.component.retro.plot.helper}
-plot.function.retro <- function(model) {
-  p.function.retro <- function(soa.toBeep) { p.beforeBeep.retro(soa.toBeep, data.soa.toCue, model) }
-  title <- sprintf("Retro - %s", model$name, data.soa.toCue)
-  subtitle <- sprintf("SOA[Target-Cue] = %d ms", data.soa.toCue)
+plot.function.retro <- function(model, soa.toCue=soa.toCue.default) {
+  p.function.retro <- function(soa.toBeep) { p.beforeBeep.retro(soa.toBeep, soa.toCue, model) }
+  title <- sprintf("Retro - %s", model$name, soa.toCue)
+  subtitle <- sprintf("SOA[Target-Cue] = %d ms", soa.toCue)
   plot.function(p.function.retro, model$color, title, subtitle)
 }
 ```
 
 ``` {r.component.retro.plot}
-plot.function.retro(model.CA)
-plot.function.retro(model.TM)
+plot.function.retro(model.CA, 100)
+plot.function.retro(model.CA, 300)
+plot.function.retro(model.TM, 100)
+plot.function.retro(model.TM, 300)
 ```
 
 ## Fonctions psychométriques résultantes : Mixture Model
@@ -208,9 +210,9 @@ p.beforeBeep.mixture <- function(soa.toBeep, soa.toCue = 0, model) {
 
 ``` {r.plot.function.mixture.cue.helper}
 plot.function.mixture <- function(model) {
-  p.function.mixture <- function(soa.toBeep) { p.beforeBeep.mixture(soa.toBeep, data.soa.toCue, model) }
+  p.function.mixture <- function(soa.toBeep) { p.beforeBeep.mixture(soa.toBeep, soa.toCue.default, model) }
   title <- sprintf("Mixture - %s", model$name)
-  subtitle <- sprintf("SOA[Target-Cue] = %d ms", data.soa.toCue)
+  subtitle <- sprintf("SOA[Target-Cue] = %d ms", soa.toCue.default)
   plot.function(p.function.mixture, model$color, title, subtitle)
 }
 ```
@@ -225,19 +227,19 @@ plot.function.mixture(model.TM)
 Nous allons ici comparer la fonction psychométrique de la condition avec-cue avec celle de la condition no-cue, et voir comment cette comparaison évolue en fonction du SOA[cue-target] en le modifiant de façon interactive. Ceci correspond correspond aux observations que l'on mesurerait empiriquement.
 
 ``` {r plot.comparison.helper}
-plot.mixtures <- function(model, input.soa.toCue = data.soa.toCue) {
+plot.mixtures <- function(model, input.soa.toCue = soa.toCue.default) {
   title <- sprintf("%s Model", model$name)
   subtitle <- sprintf("SOA[Target-Cue] = %d ms", input.soa.toCue)
   color <- model$color
   lty <- "dashed"
-  plot(data.soa.toBeep,
-       p.beforeBeep.mixture.nocue(data.soa.toBeep),
+  plot(soa.toBeep.levels,
+       p.beforeBeep.mixture.nocue(soa.toBeep.levels),
        type="l", col="black", lty="dotted",
        xlab="SOA[Target-Beep] (ms)", ylab="P(\"T < B\")",
        ylim=c(0,1),
        main=title)
-  lines(data.soa.toBeep,
-        p.beforeBeep.mixture(data.soa.toBeep, soa.toCue = input.soa.toCue, model),
+  lines(soa.toBeep.levels,
+        p.beforeBeep.mixture(soa.toBeep.levels, soa.toCue = input.soa.toCue, model),
         col=color, lty=lty)
   mtext(subtitle)
   legend("topleft", inset=.05, lwd=2,
@@ -250,7 +252,7 @@ plot.mixtures <- function(model, input.soa.toCue = data.soa.toCue) {
 On utilise Shiny pour modifier le SOA[target-cue] de façon interactive et voir son effet sur les graphes.
 
 ``` {r plot.comparison.cue.nocue.interactive}
-sliderInput("soa.toCue.comparison", "SOA[Target-Cue] (ms)", -100, 400, data.soa.toCue, step = 25, round = TRUE)
+sliderInput("soa.toCue.comparison", "SOA[Target-Cue] (ms)", -100, 400, soa.toCue.default, step = 25, round = TRUE)
 
 renderPlot({ plot.mixtures(model.CA, input$soa.toCue.comparison) })
 renderPlot({ plot.mixtures(model.TM, input$soa.toCue.comparison) })
