@@ -29,11 +29,11 @@ knitr::include_graphics("./Figures/fig_deroulement_essai.png")
 
 ### Hypothèses
 
-L’objectif premier de l'expérience est déterminer si, dans la rétroperception, il y a confusion ou indépendance du moment où l’on juge que la cible est apparue avec le moment où l’on en a pris conscience. Nous avons deux hypothèses alternatives :
+L’objectif premier de l'expérience est de déterminer si, dans la rétroperception, il y a confusion ou indépendance du moment où l’on juge que la cible est apparue avec le moment où l’on en a pris conscience. Nous avons deux hypothèses alternatives :
 
 **(CA)** Hypothèse *Conscious Access* : Il y a confusion du jugement du temps où la cible est apparue avec le moment où l'on a pris conscience de la cible. Ainsi, selon cette hypothèse, lors de la rétroperception, puisque l’instant où la cible accède à la conscience est retardée, la valeur du jugement temporel qui lui est attribuée est elle aussi être retardée, et ce retard est proportionnel au SOA entre la cible et l'indice.
 
-**(TM)** Hypothèse *Time Marker* : Un processus de traitement préconscient encode un marqueur temporel de la cible qui sert de référence subjective plus tard pour juger de som moment d'apparition. Ainsi, selon cette hypothèse, l’instant où la cible est présentée ne devrait pas induire de décalage proportionnel au SOA sur le jugement temporel en moyenne.
+**(TM)** Hypothèse *Time Marker* : Un processus de traitement préconscient encode un marqueur temporel de la cible qui sert de référence subjective plus tard pour juger de son moment d'apparition. Ainsi, selon cette hypothèse, l’instant où la cible est présentée ne devrait pas induire de décalage proportionnel au SOA sur le jugement temporel en moyenne.
 
 ### Types d'essais
 

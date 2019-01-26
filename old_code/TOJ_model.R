@@ -34,14 +34,6 @@ p.trials <- function(soa.toCue, include.guesses = TRUE) {
   list(guess = p.g, seen = p.seen, retro = p.retro)
 }
 
-### with cue present
-p.trials <- function(soa.toCue, include.guesses = TRUE) {
-  p.g <- if (include.guesses) p.guess(soa.toCue) else 0
-  p.seen <- p.seen.nocue
-  p.retro <- 1 - p.g - p.seen
-  list(guess = p.g, seen = p.seen, retro = p.retro)
-}
-
 ### no cue
 p.trials.nocue <- function(include.guesses = TRUE) {
   p.g <- if (include.guesses) 1 - p.seen.nocue else 0
