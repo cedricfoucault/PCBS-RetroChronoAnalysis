@@ -3,6 +3,8 @@ Projet PCBS : Modélisation du Temporal Order Judgement dans l'effet de rétro-p
 
 **L'ensemble du rapport et du code du projet PCBS sont contenus dans le fichier `TOJ_model_report.Rmd`.**
 
+Il est aussi publié en ligne à l'adresse : [https://cedricfoucault.shinyapps.io/TOJ\_model\_report/](https://cedricfoucault.shinyapps.io/TOJ_model_report/).
+
 Il s'agit d'un document R markdown **dynamique**, il faut donc l'exécuter pour visualiser et interagir avec le rapport.
 
 Pour l'exécuter, je recommande d'utiliser RStudio, disponible gratuitement sur [rstudio.com](https://www.rstudio.com).
