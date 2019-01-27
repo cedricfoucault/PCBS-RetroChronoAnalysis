@@ -1,5 +1,5 @@
 ---
-title: "Modélisation du Temporal Order Judgement dans l'effet de rétro-perception"
+title: "Modélisation du Temporal Order Judgement dans l'effet de rétroperception"
 author: "Cédric Foucault"
 output:
   html_document:
